@@ -1,0 +1,21 @@
+{
+  "name": "InternationalDebtStatistics",
+  "dataColors": [
+    "#0063B2",
+    "#438945",
+    "#FFB900",
+    "#D83B01",
+    "#8764B8",
+    "#00B7C3"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#505050",
+  "tableAccent": "#0063B2",
+  "good": "#438945",
+  "neutral": "#FFB900",
+  "bad": "#D83B01",
+  "maximum": "#D83B01",
+  "center": "#FFB900",
+  "minimum": "#438945",
+  "null": "#CCCCCC"
+}
