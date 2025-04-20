@@ -2,7 +2,7 @@
 
 A comprehensive Power BI dashboard for analyzing and visualizing international debt statistics across different regions and countries.
 
-![Dashboard Preview](screenshots/dashboard-preview.png)
+![Dashboard Preview](Dashboard.pdf)
 
 ## Project Overview
 
@@ -20,7 +20,10 @@ This project provides interactive visualizations and analysis tools for internat
 ## Technical Architecture
 
 ### Data Source
-The dashboard uses SQL Server as the backend data store, with a well-structured dimensional model to represent debt statistics across countries and regions.
+The dashboard uses data from the World Bank's International Debt Statistics dataset:
+- **Source URL**: [World Bank Data Catalog - International Debt Statistics](https://datacatalog.worldbank.org/search/dataset/0038015/International-Debt-Statistics)
+- **Database**: Microsoft SQL Server
+- **Update Frequency**: Annual
 
 ### Technology Stack
 - **Database**: Microsoft SQL Server
@@ -29,9 +32,10 @@ The dashboard uses SQL Server as the backend data store, with a well-structured 
 - **Version Control**: Git/GitHub
 
 ### Data Model
-The solution is built on a star schema with:
-- Fact table: DebtStatistics (debt amounts, GDP figures, debt service ratios)
-- Dimension tables: Countries, Regions, Time
+The solution is built on a structured data model with:
+- **Countries**: Contains country metadata including regions and income groups
+- **DebtData**: Main fact table with debt statistics
+- **Series**: Contains information about different debt metrics/indicators
 
 ## Dashboard Components
 
@@ -56,31 +60,49 @@ The dashboard utilizes several custom DAX measures including:
 ```
 // Total Regional Debt
 Total Regional Debt = 
-CALCULATE(SUM(DebtStatistics[DebtAmount]), ALLEXCEPT(DebtStatistics, DebtStatistics[RegionID]))
+CALCULATE(SUM(DebtData[Value]), DebtData[SeriesCode]="DT.DOD.DECT.CD", ALLEXCEPT(DebtData, DebtData[CountryCode]))
 
-// Regional Debt to GDP Ratio
-Regional Debt to GDP Ratio = 
-DIVIDE([Total Regional Debt], SUM(DebtStatistics[GDPAmount]), 0)
+// Regional Debt to GNI Ratio
+Regional Debt to GNI Ratio = 
+DIVIDE([Total Regional Debt], SUM(DebtData[Value]), 0)
+
+// YoY Growth Rate
+Regional Debt YoY Growth = 
+VAR CurrentYear = MAX(DebtData[Year])
+VAR CurrentYearDebt = CALCULATE([Total Regional Debt], DebtData[Year] = CurrentYear)
+VAR PreviousYearDebt = CALCULATE([Total Regional Debt], DebtData[Year] = CurrentYear - 1)
+RETURN DIVIDE(CurrentYearDebt - PreviousYearDebt, PreviousYearDebt, 0)
+
+// Debt Concentration Ratio
+Debt Concentration Ratio = 
+VAR Top3Debt = CALCULATE(
+    SUM(DebtData[Value]),
+    TOPN(3, VALUES(Countries[ShortName]), CALCULATE(SUM(DebtData[Value])), DESC)
+)
+RETURN DIVIDE(Top3Debt, [Total Regional Debt], 0)
 ```
 
 ### SQL Queries
 Core data preparation is handled through SQL, including:
 
 ```sql
--- Total debt by region and year
+-- Regional debt analysis
 SELECT 
-    r.RegionName,
-    ds.Year,
-    SUM(ds.DebtAmount) as TotalRegionalDebt,
-    SUM(ds.GDPAmount) as TotalRegionalGDP
+    c.Region,
+    d.Year,
+    SUM(CASE WHEN d.SeriesCode = 'DT.DOD.DECT.CD' THEN d.Value ELSE 0 END) AS TotalExternalDebt,
+    AVG(CASE WHEN d.SeriesCode = 'DT.DOD.DECT.GN.ZS' THEN d.Value END) AS AvgDebtToGNIRatio,
+    AVG(CASE WHEN d.SeriesCode = 'DT.TDS.DECT.EX.ZS' THEN d.Value END) AS AvgDebtServiceRatio
 FROM 
-    dbo.DebtStatistics ds
+    DebtData d
 JOIN 
-    dbo.Countries c ON ds.CountryID = c.CountryID
-JOIN 
-    dbo.Regions r ON c.RegionID = r.RegionID
+    Countries c ON d.CountryCode = c.CountryCode
+WHERE 
+    d.Year BETWEEN 2013 AND 2022
+    AND c.Region IS NOT NULL
+    AND d.SeriesCode IN ('DT.DOD.DECT.CD', 'DT.DOD.DECT.GN.ZS', 'DT.TDS.DECT.EX.ZS')
 GROUP BY 
-    r.RegionName, ds.Year
+    c.Region, d.Year
 ```
 
 ## Setup and Usage
@@ -91,7 +113,7 @@ GROUP BY
 
 ### Installation
 1. Clone this repository
-2. Restore the database from `database/DebtStatistics_DB.bak`
+2. Execute the SQL scripts in the database folder to set up your database
 3. Open the `InternationalDebtDashboard.pbix` file in Power BI Desktop
 4. Update the data source connection to point to your SQL Server instance
 5. Refresh the data
@@ -109,8 +131,8 @@ GROUP BY
 - Mobile-optimized view for on-the-go analysis
 
 ## Screenshots
-![Country Details](screenshots/country-details.png)
-![Trend Analysis](screenshots/trend-analysis.png)
+![Country Details](country-details.png)
+![Trend Analysis](trend-analysis.png)
 
 ## Author
 - [Tushar Dhawale](https://github.com/tushardhawale123)
